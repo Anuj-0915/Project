@@ -1,0 +1,2786 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>QuizMaster – Interactive Quiz</title>
+    <style>
+      @property --ang {
+        syntax: "<angle>";
+        inherits: false;
+        initial-value: 0deg;
+      }
+      :root {
+        --bg: #070d22;
+        --bg2: #121c45;
+        --card: rgba(15, 23, 56, 0.72);
+        --line: #2a3873;
+        --text: #eef1ff;
+        --muted: #a9b3d8;
+        --a1: #4f5bf0;
+        --a2: #7c3aed;
+        --ok: #2ecc8f;
+        --bad: #ff6b88;
+        --warn: #ffb84d;
+        --r: 16px;
+        --s: 1rem;
+        --grad: linear-gradient(135deg, var(--a1), var(--a2));
+        --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+      }
+      html {
+        scroll-behavior: smooth;
+      }
+      body {
+        min-height: 100vh;
+        font:
+          16px/1.5 system-ui,
+          -apple-system,
+          "Segoe UI",
+          Roboto,
+          sans-serif;
+        color: var(--text);
+        color-scheme: dark;
+        background: var(--bg);
+        overflow-x: hidden;
+      }
+      h1,
+      h2,
+      h3 {
+        line-height: 1.2;
+      }
+      h2 {
+        font-size: 1.6rem;
+        margin-bottom: 0.4rem;
+      }
+      h3 {
+        margin: 2rem 0 1rem;
+      }
+      :focus-visible {
+        outline: 3px solid #9fb0ff;
+        outline-offset: 3px;
+        border-radius: 8px;
+      }
+      [tabindex="-1"]:focus {
+        outline: none;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      [hidden] {
+        display: none !important;
+      }
+
+      /* ===== Ambient background: aurora, grid, particle canvas ===== */
+      .aur {
+        position: fixed;
+        inset: 0;
+        z-index: -2;
+        overflow: hidden;
+        pointer-events: none;
+      }
+      .aur::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image:
+          linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+          linear-gradient(
+            90deg,
+            rgba(255, 255, 255, 0.035) 1px,
+            transparent 1px
+          );
+        background-size: 56px 56px;
+        -webkit-mask-image: radial-gradient(
+          ellipse at 50% 25%,
+          #000,
+          transparent 72%
+        );
+        mask-image: radial-gradient(ellipse at 50% 25%, #000, transparent 72%);
+      }
+      .aur i {
+        position: absolute;
+        width: 70vmax;
+        height: 70vmax;
+        border-radius: 50%;
+        opacity: 0.5;
+        animation: drift 24s ease-in-out infinite alternate;
+      }
+      .aur i:nth-child(1) {
+        left: -22vmax;
+        top: -26vmax;
+        background: radial-gradient(circle, #2f3fd6, transparent 62%);
+        translate: 0 calc(var(--sy, 0) * -0.12px);
+      }
+      .aur i:nth-child(2) {
+        right: -28vmax;
+        top: 8vmax;
+        background: radial-gradient(circle, #7c3aed, transparent 62%);
+        animation-duration: 30s;
+        animation-delay: -9s;
+        translate: 0 calc(var(--sy, 0) * -0.2px);
+      }
+      .aur i:nth-child(3) {
+        left: 8vmax;
+        bottom: -38vmax;
+        background: radial-gradient(circle, #1b7fd8, transparent 62%);
+        animation-duration: 36s;
+        animation-delay: -16s;
+        opacity: 0.35;
+        translate: 0 calc(var(--sy, 0) * -0.06px);
+      }
+      @keyframes drift {
+        to {
+          transform: translate3d(8vmax, 6vmax, 0) scale(1.2);
+        }
+      }
+      #bg,
+      #fx {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+      }
+      #bg {
+        z-index: -1;
+      }
+      #fx {
+        z-index: 90;
+      }
+
+      /* ===== Page-transition veil + custom cursor ===== */
+      .veil {
+        position: fixed;
+        inset: 0;
+        z-index: 100;
+        display: flex;
+        pointer-events: none;
+      }
+      .veil i {
+        flex: 1;
+        background: linear-gradient(180deg, #1b2a95, #4a1fa8);
+        transform: scaleY(0);
+        transform-origin: bottom;
+      }
+      .veil i:nth-child(2) {
+        transition-delay: 0.04s;
+      }
+      .veil i:nth-child(3) {
+        transition-delay: 0.08s;
+      }
+      .veil i:nth-child(4) {
+        transition-delay: 0.12s;
+      }
+      .veil.in i {
+        transform: scaleY(1);
+        transition: transform 0.32s cubic-bezier(0.77, 0, 0.18, 1);
+      }
+      .veil.out i {
+        transform: scaleY(0);
+        transform-origin: top;
+        transition: transform 0.32s cubic-bezier(0.77, 0, 0.18, 1);
+      }
+      .curs {
+        position: fixed;
+        left: 0;
+        top: 0;
+        width: 36px;
+        height: 36px;
+        margin: -18px 0 0 -18px;
+        border: 1.5px solid rgba(160, 176, 255, 0.75);
+        border-radius: 50%;
+        pointer-events: none;
+        z-index: 60;
+        opacity: 0;
+        transition:
+          width 0.25s var(--ease),
+          height 0.25s var(--ease),
+          margin 0.25s var(--ease),
+          background 0.25s,
+          opacity 0.3s;
+      }
+      .curs.on {
+        opacity: 0.9;
+      }
+      .curs.big {
+        width: 64px;
+        height: 64px;
+        margin: -32px 0 0 -32px;
+        background: rgba(124, 138, 255, 0.14);
+      }
+
+      /* ===== Header ===== */
+      .top {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        padding: 0.7rem 1.2rem;
+        -webkit-backdrop-filter: blur(14px);
+        backdrop-filter: blur(14px);
+        background: linear-gradient(rgba(7, 13, 34, 0.8), rgba(7, 13, 34, 0.4));
+      }
+      .top-in {
+        max-width: 1080px;
+        margin: auto;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        font-weight: 800;
+        letter-spacing: 0.3px;
+      }
+      .logo {
+        width: 14px;
+        height: 14px;
+        border-radius: 4px;
+        background: var(--grad);
+        animation: rot 6s ease-in-out infinite;
+      }
+      @keyframes rot {
+        50% {
+          transform: rotate(180deg) scale(1.25);
+        }
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      .spbar {
+        position: absolute;
+        left: 0;
+        bottom: 0;
+        height: 2px;
+        width: 100%;
+        background: var(--grad);
+        transform: scaleX(0);
+        transform-origin: left;
+      }
+      main {
+        max-width: 1080px;
+        margin: auto;
+        padding: 0 var(--s) 3rem;
+      }
+      #s-quiz,
+      #s-result {
+        max-width: 860px;
+        margin-inline: auto;
+      }
+      .screen {
+        animation: in 0.45s ease both;
+      }
+      @keyframes in {
+        from {
+          opacity: 0;
+          transform: translateY(14px);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+
+      /* ===== Buttons ===== */
+      .btn {
+        font: inherit;
+        font-weight: 600;
+        color: #fff;
+        border: 1px solid var(--line);
+        background: var(--bg2);
+        padding: 0.65rem 1.2rem;
+        border-radius: 12px;
+        cursor: pointer;
+        translate: var(--mx, 0) var(--my, 0);
+        transition:
+          transform 0.15s,
+          box-shadow 0.15s,
+          opacity 0.15s,
+          translate 0.35s var(--ease);
+      }
+      .btn:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(79, 91, 240, 0.35);
+      }
+      .btn:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+      .btn.primary {
+        background: var(--grad);
+        border-color: transparent;
+      }
+      .btn.big {
+        font-size: 1.2rem;
+        padding: 0.9rem 2.4rem;
+        border-radius: 99px;
+        animation: glow 2.6s infinite;
+      }
+      .btn.big span {
+        display: inline-block;
+        transition: transform 0.3s var(--ease);
+      }
+      .btn.big:hover span {
+        transform: translateX(6px);
+      }
+      .btn.small {
+        padding: 0.4rem 0.8rem;
+        font-size: 0.85rem;
+      }
+      @keyframes glow {
+        0% {
+          box-shadow: 0 0 0 0 rgba(124, 58, 237, 0.55);
+        }
+        70%,
+        100% {
+          box-shadow: 0 0 0 20px transparent;
+        }
+      }
+
+      /* ===== Landing ===== */
+      .hero-w {
+        position: relative;
+        min-height: calc(100vh - 64px);
+        min-height: calc(100svh - 64px);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 2rem 0 4rem;
+      }
+      .deco {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        overflow: hidden;
+      }
+      .fl {
+        position: absolute;
+        display: grid;
+        place-items: center;
+        width: var(--w, 56px);
+        height: var(--w, 56px);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: rgba(18, 28, 69, 0.55);
+        -webkit-backdrop-filter: blur(6px);
+        backdrop-filter: blur(6px);
+        font-weight: 800;
+        color: #b9c4ff;
+        translate: calc(var(--px, 0) * var(--d) * 1px)
+          calc(var(--py, 0) * var(--d) * 1px);
+        transition: translate 0.5s ease-out;
+        animation: bob2 7s ease-in-out infinite alternate;
+      }
+      @keyframes bob2 {
+        to {
+          transform: translateY(-18px) rotate(8deg);
+        }
+      }
+      .live {
+        position: relative;
+        display: inline-flex;
+        gap: 0.6rem;
+        align-items: center;
+        padding: 0.35rem 1rem;
+        border: 1px solid var(--line);
+        border-radius: 99px;
+        background: rgba(18, 28, 69, 0.6);
+        -webkit-backdrop-filter: blur(6px);
+        backdrop-filter: blur(6px);
+        font-size: 0.9rem;
+        color: var(--muted);
+        animation: in 0.8s var(--ease) 0.1s backwards;
+      }
+      .live::before {
+        content: "";
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--ok);
+        animation: ping 1.8s infinite;
+      }
+      .live b {
+        display: inline-block;
+        min-width: 17ch;
+        text-align: left;
+        color: var(--text);
+      }
+      .live b.sw {
+        animation: swap 0.55s var(--ease);
+      }
+      @keyframes ping {
+        0% {
+          box-shadow: 0 0 0 0 rgba(46, 204, 143, 0.6);
+        }
+        70%,
+        100% {
+          box-shadow: 0 0 0 10px transparent;
+        }
+      }
+      @keyframes swap {
+        from {
+          opacity: 0;
+          transform: translateY(60%);
+          filter: blur(4px);
+        }
+      }
+      .hero {
+        position: relative;
+        white-space: nowrap;
+        font-size: clamp(2.8rem, 12.5vw, 8rem);
+        font-weight: 900;
+        letter-spacing: -0.03em;
+        line-height: 1;
+        margin: 1.2rem 0 0;
+      }
+      .hero .ch {
+        display: inline-block;
+        color: #aeb9ff;
+        color: hsl(calc(222 + var(--i) * 6) 95% calc(80% - var(--i) * 1%));
+        cursor: default;
+        transition:
+          transform 0.35s var(--ease),
+          color 0.3s,
+          text-shadow 0.3s;
+        animation:
+          chIn 1s var(--ease) calc(0.15s + var(--i) * 60ms) backwards,
+          bob 5s ease-in-out calc(1.4s + var(--i) * 140ms) infinite;
+      }
+      .hero .ch:hover {
+        transform: translateY(-12px) rotate(-6deg) scale(1.12);
+        color: #fff;
+        text-shadow: 0 0 30px rgba(124, 58, 237, 0.95);
+      }
+      @keyframes chIn {
+        from {
+          opacity: 0;
+          transform: translateY(80%) rotate(12deg) scale(0.6);
+          filter: blur(12px);
+        }
+      }
+      @keyframes bob {
+        50% {
+          translate: 0 -0.06em;
+        }
+      }
+      .tag {
+        position: relative;
+        max-width: 34rem;
+        margin: 1.3rem auto 2rem;
+        color: var(--muted);
+        font-size: 1.15rem;
+        animation: in 0.9s var(--ease) 0.9s backwards;
+      }
+      .cta {
+        position: relative;
+        animation: in 0.9s var(--ease) 1.1s backwards;
+      }
+      .cue {
+        position: absolute;
+        bottom: 1.2rem;
+        left: 50%;
+        translate: -50% 0;
+        width: 26px;
+        height: 42px;
+        border: 2px solid var(--line);
+        border-radius: 14px;
+      }
+      .cue::after {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 7px;
+        width: 4px;
+        height: 8px;
+        margin-left: -2px;
+        border-radius: 2px;
+        background: #b9c4ff;
+        animation: wheel 1.6s ease-in-out infinite;
+      }
+      @keyframes wheel {
+        0% {
+          opacity: 0;
+          transform: translateY(0);
+        }
+        30% {
+          opacity: 1;
+        }
+        100% {
+          opacity: 0;
+          transform: translateY(14px);
+        }
+      }
+      .mq {
+        overflow: hidden;
+        white-space: nowrap;
+        margin: 1rem -1rem 3rem;
+        transform: rotate(-1.5deg);
+        -webkit-mask-image: linear-gradient(
+          90deg,
+          transparent,
+          #000 12%,
+          #000 88%,
+          transparent
+        );
+        mask-image: linear-gradient(
+          90deg,
+          transparent,
+          #000 12%,
+          #000 88%,
+          transparent
+        );
+      }
+      .mt {
+        display: inline-flex;
+        animation: marq 34s linear infinite;
+      }
+      .mq:hover .mt {
+        animation-play-state: paused;
+      }
+      .set {
+        display: inline-flex;
+        gap: 2rem;
+        padding-right: 2rem;
+      }
+      .set span {
+        font-size: clamp(2rem, 6vw, 4rem);
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: 0.02em;
+        color: transparent;
+        -webkit-text-stroke: 1.5px rgba(160, 176, 255, 0.55);
+        transition: color 0.3s;
+      }
+      .set span:hover {
+        color: rgba(160, 176, 255, 0.9);
+      }
+      .set span.dot {
+        -webkit-text-stroke: 0;
+        color: var(--a2);
+      }
+      @keyframes marq {
+        to {
+          transform: translateX(-50%);
+        }
+      }
+      .sec {
+        padding: 3rem 0;
+      }
+      .sec > h2 {
+        font-size: clamp(1.8rem, 5vw, 3rem);
+        text-align: center;
+        letter-spacing: -0.02em;
+        margin-bottom: 2rem;
+      }
+      .steps {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 1.2rem;
+      }
+      .step {
+        height: 100%;
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        padding: 1.6rem;
+        -webkit-backdrop-filter: blur(8px);
+        backdrop-filter: blur(8px);
+        transition:
+          transform 0.3s var(--ease),
+          border-color 0.3s,
+          box-shadow 0.3s;
+      }
+      .step:hover {
+        transform: translateY(-6px);
+        border-color: var(--a1);
+        box-shadow: 0 16px 36px rgba(79, 91, 240, 0.25);
+      }
+      .step em {
+        display: block;
+        font-style: normal;
+        font-size: 3.6rem;
+        font-weight: 900;
+        line-height: 1;
+        background: var(--grad);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+      .step h3 {
+        margin: 0.6rem 0 0.3rem;
+      }
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 1rem;
+        text-align: center;
+      }
+      .stats b {
+        font-size: clamp(2.4rem, 6vw, 3.8rem);
+        font-weight: 900;
+        background: linear-gradient(135deg, #8fa0ff, #c39bff);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+      .stats span {
+        display: block;
+      }
+      .final {
+        text-align: center;
+        padding: 3rem 0 1rem;
+      }
+      .final h2 {
+        margin-bottom: 1.4rem;
+      }
+      .rv {
+        opacity: 0;
+        transform: translateY(34px);
+        filter: blur(6px);
+        transition:
+          opacity 0.8s var(--ease),
+          transform 0.8s var(--ease),
+          filter 0.8s var(--ease);
+        transition-delay: calc(var(--d, 0) * 90ms);
+      }
+      .rv.in {
+        opacity: 1;
+        transform: none;
+        filter: none;
+      }
+
+      /* ===== Categories ===== */
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1.1rem;
+        margin: 1.5rem 0;
+      }
+      .cat {
+        position: relative;
+        overflow: hidden;
+        font: inherit;
+        color: inherit;
+        text-align: left;
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        padding: 1.5rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        cursor: pointer;
+        -webkit-backdrop-filter: blur(8px);
+        backdrop-filter: blur(8px);
+        transform: perspective(800px) rotateX(var(--rx, 0deg))
+          rotateY(var(--ry, 0deg)) translateY(var(--ty, 0px));
+        transition:
+          transform 0.5s var(--ease),
+          border-color 0.3s,
+          box-shadow 0.3s;
+        animation: catIn 0.8s var(--ease) calc(var(--i) * 90ms + 0.2s) backwards;
+      }
+      .cat.tilt {
+        transition:
+          transform 0.1s linear,
+          border-color 0.3s,
+          box-shadow 0.3s;
+      }
+      .cat:hover,
+      .cat:focus-visible {
+        --ty: -6px;
+        border-color: var(--a1);
+        box-shadow: 0 18px 40px rgba(79, 91, 240, 0.3);
+      }
+      .cat::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.3s;
+        background: radial-gradient(
+          260px circle at var(--gx, 50%) var(--gy, 0%),
+          rgba(140, 160, 255, 0.25),
+          transparent 60%
+        );
+      }
+      .cat:hover::after {
+        opacity: 1;
+      }
+      .cat .ico {
+        font-size: 2.2rem;
+        display: inline-block;
+        transition: transform 0.5s var(--ease);
+      }
+      .cat:hover .ico {
+        transform: scale(1.25) rotate(-8deg);
+      }
+      .cat strong {
+        font-size: 1.15rem;
+      }
+      .cat small {
+        color: var(--muted);
+      }
+      .cat .best {
+        margin-top: 0.5rem;
+        color: #b9c4ff;
+        font-size: 0.9rem;
+      }
+      .cat .arr {
+        position: absolute;
+        right: 1.2rem;
+        top: 1.2rem;
+        opacity: 0;
+        translate: -10px 0;
+        transition: 0.3s var(--ease);
+      }
+      .cat:hover .arr {
+        opacity: 1;
+        translate: 0 0;
+      }
+      @keyframes catIn {
+        from {
+          opacity: 0;
+          transform: perspective(800px) translateY(60px) rotateX(-25deg);
+        }
+      }
+
+      /* ===== Quiz ===== */
+      .hud {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 0.6rem;
+        margin: 1rem 0;
+      }
+      .stat {
+        position: relative;
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 0.5rem 0.8rem;
+        text-align: center;
+        -webkit-backdrop-filter: blur(8px);
+        backdrop-filter: blur(8px);
+      }
+      .stat span {
+        display: block;
+        font-size: 0.75rem;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      .stat b {
+        display: inline-block;
+        font-size: 1.25rem;
+      }
+      .stat.low b {
+        color: var(--bad);
+      }
+      .stat.low {
+        animation: redp 1s infinite;
+      }
+      .bump {
+        animation: bump 0.5s var(--ease);
+      }
+      @keyframes bump {
+        40% {
+          transform: scale(1.4);
+          color: #fff;
+          text-shadow: 0 0 18px var(--a2);
+        }
+      }
+      @keyframes redp {
+        50% {
+          box-shadow: 0 0 0 4px rgba(255, 107, 136, 0.22);
+          border-color: var(--bad);
+        }
+      }
+      .plus {
+        position: absolute;
+        right: 0.7rem;
+        top: 0.2rem;
+        font-weight: 800;
+        color: var(--ok);
+        pointer-events: none;
+        animation: rise 1s var(--ease) forwards;
+      }
+      @keyframes rise {
+        from {
+          opacity: 0;
+          transform: translateY(8px);
+        }
+        20% {
+          opacity: 1;
+        }
+        to {
+          opacity: 0;
+          transform: translateY(-34px);
+        }
+      }
+      .prog,
+      .tbar {
+        background: var(--bg2);
+        border-radius: 99px;
+        overflow: hidden;
+      }
+      .prog {
+        height: 10px;
+      }
+      .tbar {
+        height: 4px;
+        margin: 0.5rem 0 1rem;
+      }
+      .prog i,
+      .tbar i {
+        display: block;
+        height: 100%;
+        width: 0;
+        background: var(--grad);
+        transition: width 0.5s ease;
+      }
+      .prog i {
+        position: relative;
+        overflow: hidden;
+      }
+      .prog i::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        translate: -100% 0;
+        background: linear-gradient(
+          90deg,
+          transparent,
+          rgba(255, 255, 255, 0.45),
+          transparent
+        );
+        animation: shim 1.8s linear infinite;
+      }
+      @keyframes shim {
+        to {
+          translate: 100% 0;
+        }
+      }
+      .tbar i {
+        transition:
+          width 0.1s linear,
+          background 0.3s;
+        background: var(--warn);
+      }
+      .tbar i.low {
+        background: var(--bad);
+      }
+      .card {
+        position: relative;
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        padding: clamp(1.1rem, 4vw, 2rem);
+        -webkit-backdrop-filter: blur(10px);
+        backdrop-filter: blur(10px);
+        animation: cardIn 0.6s var(--ease);
+      }
+      .card::before {
+        content: "";
+        position: absolute;
+        inset: -1px;
+        border-radius: inherit;
+        padding: 1px;
+        pointer-events: none;
+        background: conic-gradient(
+          from var(--ang),
+          transparent 0 55%,
+          var(--a1),
+          var(--a2),
+          transparent
+        );
+        -webkit-mask:
+          linear-gradient(#000 0 0) content-box,
+          linear-gradient(#000 0 0);
+        -webkit-mask-composite: xor;
+        mask-composite: exclude;
+        animation: spin 6s linear infinite;
+      }
+      @keyframes spin {
+        to {
+          --ang: 360deg;
+        }
+      }
+      @keyframes cardIn {
+        from {
+          opacity: 0;
+          transform: perspective(900px) translateY(40px) rotateX(8deg)
+            scale(0.98);
+        }
+      }
+      #qtext {
+        font-size: clamp(1.2rem, 3.5vw, 1.6rem);
+        margin: 0.4rem 0 1.3rem;
+      }
+      .w {
+        display: inline-block;
+        animation: wIn 0.6s var(--ease) calc(var(--i) * 45ms + 0.1s) backwards;
+      }
+      @keyframes wIn {
+        from {
+          opacity: 0;
+          transform: translateY(0.6em);
+          filter: blur(8px);
+        }
+      }
+      .opts {
+        display: grid;
+        gap: 0.75rem;
+        grid-template-columns: 1fr;
+      }
+      @media (min-width: 720px) {
+        .opts {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+      .opt {
+        position: relative;
+        overflow: hidden;
+        font: inherit;
+        color: inherit;
+        text-align: left;
+        display: flex;
+        gap: 0.8rem;
+        align-items: center;
+        background: var(--bg2);
+        border: 2px solid var(--line);
+        border-radius: 12px;
+        padding: 0.85rem 1rem;
+        cursor: pointer;
+        transition: 0.18s;
+        animation: optIn 0.6s var(--ease) calc(var(--i) * 70ms + 0.3s) backwards;
+      }
+      .opt::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(
+          90deg,
+          rgba(124, 138, 255, 0.2),
+          transparent
+        );
+        opacity: 0;
+        transition: opacity 0.25s;
+        pointer-events: none;
+      }
+      .opt:hover:not(:disabled)::before {
+        opacity: 1;
+      }
+      .opt:hover:not(:disabled) {
+        transform: translateY(-2px);
+        border-color: var(--a1);
+      }
+      .opt > * {
+        position: relative;
+      }
+      .opt .key {
+        flex: none;
+        width: 28px;
+        height: 28px;
+        border-radius: 8px;
+        background: var(--line);
+        display: grid;
+        place-items: center;
+        font-weight: 700;
+        font-size: 0.85rem;
+      }
+      .opt:disabled {
+        cursor: default;
+        color: inherit;
+      }
+      .opt.sel {
+        border-color: #8fa0ff;
+        background: #1d2a66;
+      }
+      .opt.ok {
+        border-color: var(--ok);
+        background: rgba(46, 204, 143, 0.15);
+        animation: okp 0.7s var(--ease);
+      }
+      .opt.bad {
+        border-color: var(--bad);
+        background: rgba(255, 107, 136, 0.15);
+        animation: shake 0.5s;
+      }
+      .opt:disabled:not(.ok):not(.bad):not(.sel) {
+        opacity: 0.55;
+      }
+      .rip {
+        position: absolute !important;
+        width: 20px;
+        height: 20px;
+        margin: -10px 0 0 -10px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.35);
+        pointer-events: none;
+        animation: rip 0.65s ease-out forwards;
+      }
+      @keyframes rip {
+        to {
+          transform: scale(22);
+          opacity: 0;
+        }
+      }
+      @keyframes optIn {
+        from {
+          opacity: 0;
+          transform: translateX(-40px) scale(0.96);
+        }
+      }
+      @keyframes okp {
+        0% {
+          box-shadow: 0 0 0 0 rgba(46, 204, 143, 0.6);
+        }
+        40% {
+          transform: scale(1.03);
+        }
+        100% {
+          box-shadow: 0 0 0 18px transparent;
+        }
+      }
+      @keyframes shake {
+        20%,
+        60% {
+          transform: translateX(-8px);
+        }
+        40%,
+        80% {
+          transform: translateX(8px);
+        }
+      }
+      .fb {
+        margin-top: 1rem;
+        padding: 0.8rem 1rem;
+        border-radius: 12px;
+        display: none;
+        border-left: 4px solid;
+      }
+      .fb.show {
+        display: block;
+        animation: in 0.3s;
+      }
+      .fb.ok {
+        border-color: var(--ok);
+        background: rgba(46, 204, 143, 0.1);
+      }
+      .fb.bad {
+        border-color: var(--bad);
+        background: rgba(255, 107, 136, 0.1);
+      }
+      .fb.info {
+        border-color: var(--warn);
+        background: rgba(255, 184, 77, 0.1);
+      }
+      .pmsg {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        font-size: 1.8rem;
+        font-weight: 800;
+        z-index: 2;
+        animation: pulse 1.6s ease-in-out infinite;
+      }
+      @keyframes pulse {
+        50% {
+          opacity: 0.5;
+          transform: scale(1.05);
+        }
+      }
+      #card.paused #qbody {
+        filter: blur(10px);
+        opacity: 0.5;
+      }
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.6rem;
+        margin-top: 1.2rem;
+        align-items: center;
+      }
+      .actions .sp {
+        flex: 1;
+      }
+      .actions.mid {
+        justify-content: center;
+        margin: 1.5rem 0;
+      }
+
+      /* ===== Results ===== */
+      .res {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 2rem;
+        align-items: center;
+        justify-content: center;
+        margin: 1.5rem 0;
+      }
+      .ringwrap {
+        position: relative;
+        isolation: isolate;
+        width: 180px;
+        height: 180px;
+      }
+      .ringwrap::before {
+        content: "";
+        position: absolute;
+        inset: -12px;
+        z-index: -1;
+        border-radius: 50%;
+        background: conic-gradient(
+          from var(--ang),
+          transparent,
+          rgba(124, 58, 237, 0.6),
+          transparent
+        );
+        filter: blur(14px);
+        animation: spin 5s linear infinite;
+      }
+      .ringwrap svg {
+        width: 100%;
+        height: 100%;
+      }
+      .ringwrap circle {
+        fill: none;
+        stroke-width: 10;
+      }
+      .track {
+        stroke: var(--line);
+      }
+      #ring {
+        stroke: url(#g);
+        stroke-linecap: round;
+        stroke-dasharray: 339.292;
+        transition: stroke-dashoffset 1.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+      }
+      .pct {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        font-size: 2.2rem;
+        font-weight: 800;
+      }
+      .msg {
+        font-size: 1.2rem;
+        font-weight: 600;
+        max-width: 340px;
+      }
+      .badge {
+        display: inline-block;
+        margin: 0.5rem 0;
+        padding: 0.2rem 0.8rem;
+        border-radius: 99px;
+        background: rgba(255, 184, 77, 0.15);
+        color: var(--warn);
+        animation: bump 0.8s var(--ease) 1s;
+      }
+      .rstats {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(120px, 1fr));
+        gap: 0.6rem;
+        margin-top: 0.8rem;
+      }
+      .rstats div {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 0.5rem 0.9rem;
+        animation: in 0.6s var(--ease) calc(var(--i) * 80ms + 0.3s) backwards;
+      }
+      .rstats span {
+        display: block;
+        font-size: 0.75rem;
+        color: var(--muted);
+        text-transform: uppercase;
+      }
+      .rstats b {
+        font-size: 1.3rem;
+      }
+      .review {
+        list-style: none;
+        padding: 0;
+        display: grid;
+        gap: 0.8rem;
+      }
+      .review li {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-left: 5px solid var(--bad);
+        border-radius: 12px;
+        padding: 1rem;
+      }
+      .review li.ok {
+        border-left-color: var(--ok);
+      }
+      .review li.skip {
+        border-left-color: var(--warn);
+      }
+      .review p {
+        margin-top: 0.3rem;
+        color: var(--muted);
+      }
+      .review p:first-child {
+        color: var(--text);
+        font-weight: 600;
+        margin: 0;
+      }
+      .review b {
+        color: var(--text);
+      }
+      dialog {
+        background: #111a3b;
+        color: var(--text);
+        border: 1px solid var(--line);
+        border-radius: var(--r);
+        padding: 1.5rem;
+        max-width: min(400px, 90vw);
+      }
+      dialog[open] {
+        animation: cardIn 0.4s var(--ease);
+      }
+      dialog::backdrop {
+        background: rgba(5, 9, 25, 0.75);
+        -webkit-backdrop-filter: blur(3px);
+        backdrop-filter: blur(3px);
+      }
+      dialog menu {
+        display: flex;
+        gap: 0.6rem;
+        justify-content: flex-end;
+        margin-top: 1.2rem;
+        padding: 0;
+      }
+      @media (max-width: 560px) {
+        .hud {
+          grid-template-columns: repeat(2, 1fr);
+        }
+        .actions .sp {
+          display: none;
+        }
+        .actions .btn {
+          flex: 1;
+        }
+        .fl {
+          opacity: 0.35;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        ::before,
+        ::after {
+          animation: none !important;
+          transition: none !important;
+          scroll-behavior: auto !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="aur" id="aur" aria-hidden="true"><i></i><i></i><i></i></div>
+    <canvas id="bg" aria-hidden="true"></canvas>
+    <canvas id="fx" aria-hidden="true"></canvas>
+    <div class="veil" id="veil" aria-hidden="true">
+      <i></i><i></i><i></i><i></i>
+    </div>
+
+    <header class="top">
+      <div class="top-in">
+        <span class="brand"
+          ><span class="logo" aria-hidden="true"></span>QuizMaster</span
+        >
+        <button id="sound" class="btn small" aria-pressed="false">
+          🔇 Sound: Off
+        </button>
+      </div>
+      <span class="spbar" id="spbar" aria-hidden="true"></span>
+    </header>
+
+    <main>
+      <!-- Landing -->
+      <section id="s-home" class="screen">
+        <div class="hero-w">
+          <div class="deco" id="deco" aria-hidden="true">
+            <span
+              class="fl"
+              style="left: 7%; top: 20%; --d: 34; --w: 68px; font-size: 2rem"
+              >?</span
+            >
+            <span
+              class="fl"
+              style="
+                right: 9%;
+                top: 17%;
+                --d: -46;
+                --w: 60px;
+                font-size: 1.3rem;
+                animation-delay: -2s;
+              "
+              >{ }</span
+            >
+            <span
+              class="fl"
+              style="
+                left: 13%;
+                bottom: 22%;
+                --d: -28;
+                --w: 56px;
+                font-size: 1.8rem;
+                animation-delay: -4s;
+              "
+              >π</span
+            >
+            <span
+              class="fl"
+              style="
+                right: 12%;
+                bottom: 20%;
+                --d: 52;
+                --w: 64px;
+                font-size: 1.2rem;
+                animation-delay: -1s;
+              "
+              >20s</span
+            >
+            <span
+              class="fl"
+              style="
+                left: 30%;
+                top: 9%;
+                --d: 20;
+                --w: 44px;
+                font-size: 1.2rem;
+                animation-delay: -5s;
+              "
+              >✓</span
+            >
+          </div>
+          <div class="live" aria-hidden="true">
+            Now playing <b id="liveWord">General Knowledge</b>
+          </div>
+          <h1 class="hero" id="hero" tabindex="-1">QuizMaster</h1>
+          <p class="tag">
+            Test your knowledge, beat the clock, and chase your best scores.
+          </p>
+          <div class="cta">
+            <button id="start" class="btn primary big mag">
+              Start Quiz <span aria-hidden="true">→</span>
+            </button>
+          </div>
+          <span class="cue" aria-hidden="true"></span>
+        </div>
+
+        <div class="mq" aria-hidden="true"><div class="mt" id="mq"></div></div>
+
+        <section class="sec" aria-labelledby="howT">
+          <h2 class="rv" id="howT">How it works</h2>
+          <div class="steps">
+            <div class="rv" style="--d: 0">
+              <article class="step">
+                <em>01</em>
+                <h3>Pick a topic</h3>
+                <p class="muted">
+                  Choose from five categories, from General Knowledge to
+                  Mathematics.
+                </p>
+              </article>
+            </div>
+            <div class="rv" style="--d: 1">
+              <article class="step">
+                <em>02</em>
+                <h3>Beat the clock</h3>
+                <p class="muted">
+                  Every question gives you 20 seconds. Pause whenever you need a
+                  breather.
+                </p>
+              </article>
+            </div>
+            <div class="rv" style="--d: 2">
+              <article class="step">
+                <em>03</em>
+                <h3>Learn and level up</h3>
+                <p class="muted">
+                  Review each answer with explanations and chase your personal
+                  best.
+                </p>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section class="sec" aria-label="Quiz facts">
+          <div class="stats">
+            <div class="rv" style="--d: 0">
+              <b data-count="50">50</b
+              ><span class="muted">Original questions</span>
+            </div>
+            <div class="rv" style="--d: 1">
+              <b data-count="5">5</b><span class="muted">Categories</span>
+            </div>
+            <div class="rv" style="--d: 2">
+              <b data-count="20" data-suffix="s">20s</b
+              ><span class="muted">Per question</span>
+            </div>
+            <div class="rv" style="--d: 3">
+              <b data-count="100" data-suffix="%">100%</b
+              ><span class="muted">Runs in your browser</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="sec final rv">
+          <h2>Ready to test yourself?</h2>
+          <button id="start2" class="btn primary big mag">
+            Start Quiz <span aria-hidden="true">→</span>
+          </button>
+        </section>
+      </section>
+
+      <!-- Category selection -->
+      <section id="s-cats" class="screen" hidden>
+        <h2 tabindex="-1">Choose a category</h2>
+        <p class="muted">10 randomized questions per quiz · 10 points each</p>
+        <div id="catGrid" class="grid"></div>
+        <button id="backHome" class="btn">← Back</button>
+      </section>
+
+      <!-- Quiz -->
+      <section id="s-quiz" class="screen" hidden>
+        <div class="hud">
+          <div class="stat"><span>Question</span><b id="qnum"></b></div>
+          <div class="stat"><span>Score</span><b id="score"></b></div>
+          <div class="stat"><span>Correct</span><b id="corr"></b></div>
+          <div class="stat" id="timeBox">
+            <span>Time left</span><b id="time"></b>
+          </div>
+        </div>
+        <div
+          class="prog"
+          id="prog"
+          role="progressbar"
+          aria-label="Quiz progress"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          aria-valuenow="0"
+        >
+          <i id="bar"></i>
+        </div>
+        <div class="tbar" aria-hidden="true"><i id="tbar"></i></div>
+        <article class="card" id="card">
+          <div id="pauseMsg" class="pmsg" hidden>⏸ Paused</div>
+          <div id="qbody">
+            <p id="qcat" class="muted"></p>
+            <h2 id="qtext" tabindex="-1"></h2>
+            <div
+              id="opts"
+              class="opts"
+              role="group"
+              aria-label="Answer options"
+            ></div>
+            <p id="fb" class="fb" role="status" aria-live="polite"></p>
+          </div>
+        </article>
+        <div class="actions">
+          <button id="pauseBtn" class="btn small">⏸ Pause</button>
+          <button id="restartBtn" class="btn small">↻ Restart</button>
+          <button id="exitBtn" class="btn small">✕ Exit</button>
+          <span class="sp"></span>
+          <button id="next" class="btn primary mag" disabled>
+            Next Question
+          </button>
+        </div>
+      </section>
+
+      <!-- Results -->
+      <section id="s-result" class="screen" hidden>
+        <h2 tabindex="-1" style="text-align: center">Quiz complete!</h2>
+        <div class="res">
+          <div class="ringwrap">
+            <svg viewBox="0 0 120 120" aria-hidden="true">
+              <defs>
+                <linearGradient id="g">
+                  <stop offset="0" stop-color="#6c7bff" />
+                  <stop offset="1" stop-color="#c08bff" />
+                </linearGradient>
+              </defs>
+              <circle class="track" cx="60" cy="60" r="54" />
+              <circle
+                id="ring"
+                cx="60"
+                cy="60"
+                r="54"
+                transform="rotate(-90 60 60)"
+              />
+            </svg>
+            <div class="pct" id="pct"></div>
+          </div>
+          <div>
+            <p id="msg" class="msg"></p>
+            <p id="newBest" class="badge" hidden>🏆 New best score!</p>
+            <div id="rstats" class="rstats"></div>
+          </div>
+        </div>
+        <div class="actions mid">
+          <button id="retry" class="btn primary mag">Retry Quiz</button>
+          <button id="another" class="btn mag">Choose Another Category</button>
+        </div>
+        <h3>Detailed review</h3>
+        <ol id="review" class="review"></ol>
+      </section>
+    </main>
+
+    <dialog id="dlg" aria-labelledby="dlgT">
+      <form method="dialog">
+        <h2 id="dlgT" style="font-size: 1.25rem">Are you sure?</h2>
+        <p id="dlgMsg" class="muted"></p>
+        <menu>
+          <button class="btn" value="no">Cancel</button
+          ><button class="btn primary" value="yes">Yes, continue</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <script>
+      (() => {
+        "use strict";
+        const TIME = 20,
+          PTS = 10,
+          KEY = "quizmaster.best.v1";
+        const $ = (s) => document.querySelector(s);
+        const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+        const FINE = matchMedia("(hover: hover) and (pointer: fine)").matches;
+
+        /* ---------- Data: [question, correct answer, [3 wrong answers], explanation] ---------- */
+        const CATS = [
+          { id: "gk", name: "General Knowledge", icon: "🌍" },
+          { id: "cs", name: "Computer Science", icon: "💻" },
+          { id: "pg", name: "Programming", icon: "⌨️" },
+          { id: "sc", name: "Science", icon: "🔬" },
+          { id: "ma", name: "Mathematics", icon: "➗" },
+        ];
+        const QUIZ = {
+          gk: [
+            [
+              "Which is the largest ocean on Earth?",
+              "Pacific",
+              ["Atlantic", "Indian", "Arctic"],
+              "The Pacific covers about a third of the planet.",
+            ],
+            [
+              "How many continents are there?",
+              "7",
+              ["5", "6", "8"],
+              "Africa, Antarctica, Asia, Australia, Europe, North and South America.",
+            ],
+            [
+              "What is the capital of Australia?",
+              "Canberra",
+              ["Sydney", "Melbourne", "Perth"],
+              "Canberra was purpose-built as the capital.",
+            ],
+            [
+              "Which planet is known as the Red Planet?",
+              "Mars",
+              ["Venus", "Jupiter", "Mercury"],
+              "Iron oxide dust gives Mars its red color.",
+            ],
+            [
+              "Who painted the Mona Lisa?",
+              "Leonardo da Vinci",
+              ["Michelangelo", "Raphael", "Vincent van Gogh"],
+              "Leonardo painted it in the early 1500s.",
+            ],
+            [
+              "What is the currency of Japan?",
+              "Yen",
+              ["Won", "Yuan", "Ringgit"],
+              "The yen (¥) is Japan's official currency.",
+            ],
+            [
+              "Which is the largest hot desert in the world?",
+              "Sahara",
+              ["Gobi", "Kalahari", "Arabian"],
+              "The Sahara spans much of North Africa.",
+            ],
+            [
+              "How many players per side are on the pitch in soccer?",
+              "11",
+              ["9", "10", "12"],
+              "Each team fields eleven players, including the goalkeeper.",
+            ],
+            [
+              "Which language has the most native speakers?",
+              "Mandarin Chinese",
+              ["English", "Spanish", "French"],
+              "Mandarin has over 900 million native speakers.",
+            ],
+            [
+              "In which country are the pyramids of Giza?",
+              "Egypt",
+              ["Mexico", "Sudan", "Peru"],
+              "They were built as royal tombs in ancient Egypt.",
+            ],
+          ],
+          cs: [
+            [
+              "What does CPU stand for?",
+              "Central Processing Unit",
+              [
+                "Central Program Utility",
+                "Computer Personal Unit",
+                "Core Processing Utility",
+              ],
+              "The CPU executes program instructions.",
+            ],
+            [
+              "Which number system uses only 0 and 1?",
+              "Binary",
+              ["Decimal", "Octal", "Hexadecimal"],
+              "Binary is base 2, the language of digital hardware.",
+            ],
+            [
+              "Which data structure follows LIFO order?",
+              "Stack",
+              ["Queue", "Array", "Binary tree"],
+              "Last in, first out: the newest item leaves first.",
+            ],
+            [
+              "What is the time complexity of binary search?",
+              "O(log n)",
+              ["O(n)", "O(n log n)", "O(1)"],
+              "Each step halves the search range.",
+            ],
+            [
+              "Which memory loses its data when power is off?",
+              "RAM",
+              ["ROM", "SSD", "Hard disk"],
+              "RAM is volatile working memory.",
+            ],
+            [
+              "Which protocol encrypts web traffic?",
+              "HTTPS",
+              ["HTTP", "FTP", "SMTP"],
+              "HTTPS secures HTTP using TLS.",
+            ],
+            [
+              "How many bits are in a byte?",
+              "8",
+              ["4", "16", "32"],
+              "A byte is a group of eight bits.",
+            ],
+            [
+              "What is the main job of a compiler?",
+              "Translate source code into machine code",
+              [
+                "Fix syntax errors automatically",
+                "Store files on disk",
+                "Connect to the internet",
+              ],
+              "Compilers convert high-level code to executable form.",
+            ],
+            [
+              "Which is a relational database?",
+              "PostgreSQL",
+              ["MongoDB", "Redis", "Neo4j"],
+              "MongoDB is document-based, Redis key-value, Neo4j graph.",
+            ],
+            [
+              "What does an operating system do?",
+              "Manages hardware and software resources",
+              [
+                "Only runs web browsers",
+                "Only stores files",
+                "Only protects against viruses",
+              ],
+              "It coordinates the CPU, memory, devices and programs.",
+            ],
+          ],
+          pg: [
+            [
+              "Which JavaScript keyword declares a block-scoped variable?",
+              "let",
+              ["var", "def", "dim"],
+              "let (and const) are limited to their enclosing block.",
+            ],
+            [
+              "What does typeof null return in JavaScript?",
+              '"object"',
+              ['"null"', '"undefined"', '"number"'],
+              "This is a well-known quirk from early JavaScript.",
+            ],
+            [
+              "How does a single-line comment start in Python?",
+              "#",
+              ["//", "/*", "--"],
+              "Python comments begin with a hash symbol.",
+            ],
+            [
+              "What does HTML stand for?",
+              "HyperText Markup Language",
+              [
+                "HighText Machine Language",
+                "HyperTool Multi Language",
+                "Home Text Markup Level",
+              ],
+              "HTML structures the content of web pages.",
+            ],
+            [
+              "Which operator checks strict equality in JavaScript?",
+              "===",
+              ["==", "=", "!=="],
+              "=== compares value and type without coercion.",
+            ],
+            [
+              "Which Python function returns the length of a list?",
+              "len()",
+              ["size()", "count()", "length()"],
+              "len() works on lists, strings, tuples and more.",
+            ],
+            [
+              "Which CSS property changes text color?",
+              "color",
+              ["font-color", "text-color", "foreground"],
+              "The color property sets the foreground text color.",
+            ],
+            [
+              'What does "git commit" do?',
+              "Records a snapshot of staged changes",
+              [
+                "Uploads code to a remote",
+                "Creates a new branch",
+                "Deletes old files",
+              ],
+              "Commits save staged changes to local history.",
+            ],
+            [
+              "Which loop always runs its body at least once?",
+              "do...while",
+              ["for", "while", "for...in"],
+              "do...while checks its condition after the body.",
+            ],
+            [
+              "What does Array.prototype.map return?",
+              "A new array",
+              ["The original array, changed", "A single value", "undefined"],
+              "map transforms each item into a new array.",
+            ],
+          ],
+          sc: [
+            [
+              "What is the chemical formula of water?",
+              "H2O",
+              ["CO2", "O2", "NaCl"],
+              "Two hydrogen atoms bond with one oxygen atom.",
+            ],
+            [
+              "Which gas do plants absorb for photosynthesis?",
+              "Carbon dioxide",
+              ["Oxygen", "Nitrogen", "Helium"],
+              "Plants turn CO2 and water into sugar and oxygen.",
+            ],
+            [
+              'Which organelle is the "powerhouse" of the cell?',
+              "Mitochondria",
+              ["Nucleus", "Ribosome", "Golgi apparatus"],
+              "Mitochondria produce most of the cell's ATP.",
+            ],
+            [
+              "What is the approximate speed of light?",
+              "300,000 km/s",
+              ["150,000 km/s", "30,000 km/s", "3,000,000 km/s"],
+              "Light travels about 299,792 km every second.",
+            ],
+            [
+              "What is the atomic number of carbon?",
+              "6",
+              ["8", "12", "4"],
+              "Carbon has six protons.",
+            ],
+            [
+              "Which force pulls objects toward Earth?",
+              "Gravity",
+              ["Magnetism", "Friction", "Inertia"],
+              "Gravity attracts masses toward each other.",
+            ],
+            [
+              "Which is the closest star to Earth?",
+              "The Sun",
+              ["Proxima Centauri", "Sirius", "Polaris"],
+              "The Sun is about 150 million km away.",
+            ],
+            [
+              "What is the pH of pure water at 25°C?",
+              "7",
+              ["0", "1", "14"],
+              "A pH of 7 is neutral.",
+            ],
+            [
+              "Which blood cells carry oxygen?",
+              "Red blood cells",
+              ["White blood cells", "Platelets", "Plasma"],
+              "Hemoglobin in red cells binds oxygen.",
+            ],
+            [
+              "What is the hardest natural substance?",
+              "Diamond",
+              ["Quartz", "Steel", "Topaz"],
+              "Diamond is the hardest on the Mohs scale.",
+            ],
+          ],
+          ma: [
+            [
+              "What is 12 × 12?",
+              "144",
+              ["124", "132", "148"],
+              "12 × 12 = 144.",
+            ],
+            [
+              "What is the square root of 81?",
+              "9",
+              ["8", "7", "11"],
+              "9 × 9 = 81.",
+            ],
+            [
+              "What is the sum of angles in a triangle?",
+              "180°",
+              ["90°", "270°", "360°"],
+              "Triangle angles always total 180 degrees.",
+            ],
+            [
+              "What is 15% of 200?",
+              "30",
+              ["15", "20", "35"],
+              "200 × 0.15 = 30.",
+            ],
+            [
+              "Solve for x: 2x + 6 = 14",
+              "4",
+              ["3", "5", "10"],
+              "2x = 8, so x = 4.",
+            ],
+            [
+              "Which number is prime?",
+              "17",
+              ["21", "27", "39"],
+              "17 has no divisors except 1 and itself.",
+            ],
+            [
+              "What is the area of a circle with radius 3?",
+              "9π",
+              ["6π", "3π", "18π"],
+              "Area = πr² = 9π.",
+            ],
+            [
+              "What comes next: 2, 4, 8, 16, …?",
+              "32",
+              ["24", "30", "36"],
+              "Each term doubles the previous one.",
+            ],
+            [
+              "What is 2 to the power of 10?",
+              "1024",
+              ["512", "2048", "1000"],
+              "2^10 = 1024.",
+            ],
+            [
+              "What is the value of 7 × 8?",
+              "56",
+              ["54", "48", "63"],
+              "7 × 8 = 56.",
+            ],
+          ],
+        };
+
+        /* ---------- Helpers ---------- */
+        const shuffle = (a) => {
+          a = a.slice();
+          for (let i = a.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [a[i], a[j]] = [a[j], a[i]];
+          }
+          return a;
+        };
+        const el = (tag, cls, text) => {
+          const e = document.createElement(tag);
+          if (cls) e.className = cls;
+          if (text != null) e.textContent = text;
+          return e;
+        };
+        const fmt = (ms) => {
+          const s = Math.round(ms / 1000);
+          return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+        };
+        const catName = (id) => CATS.find((c) => c.id === id).name;
+
+        /* ---------- Motion helpers ---------- */
+        const retrigger = (n, c) => {
+          n.classList.remove(c);
+          void n.offsetWidth;
+          n.classList.add(c);
+        }; // restart a CSS animation
+        function countUp(node, to, suffix = "", dur = 1100) {
+          // eased number tween
+          if (REDUCED) {
+            node.textContent = to + suffix;
+            return;
+          }
+          const t0 = performance.now();
+          (function f(t) {
+            const p = Math.min(1, (t - t0) / dur),
+              e = 1 - Math.pow(1 - p, 3);
+            node.textContent = Math.round(to * e) + suffix;
+            if (p < 1) requestAnimationFrame(f);
+          })(t0);
+        }
+        function splitChars(node, text) {
+          // kinetic headline: one span per letter
+          node.setAttribute("aria-label", text);
+          node.replaceChildren();
+          [...text].forEach((c, i) => {
+            const s = el("span", "ch", c);
+            s.style.setProperty("--i", i);
+            s.setAttribute("aria-hidden", "true");
+            node.append(s);
+          });
+        }
+        function splitWords(node, text) {
+          // staggered word reveal (text stays readable by screen readers)
+          node.replaceChildren();
+          text.split(" ").forEach((w, i, a) => {
+            const s = el("span", "w", w);
+            s.style.setProperty("--i", i);
+            node.append(s);
+            if (i < a.length - 1) node.append(" ");
+          });
+        }
+        function floatText(host, text) {
+          if (REDUCED) return;
+          const s = el("span", "plus", text);
+          host.append(s);
+          s.addEventListener("animationend", () => s.remove());
+        }
+        function ripple(btn, e) {
+          if (REDUCED) return;
+          const r = btn.getBoundingClientRect(),
+            s = el("i", "rip");
+          s.style.left = (e.detail ? e.clientX - r.left : r.width / 2) + "px"; // keyboard "clicks" ripple from the center
+          s.style.top = (e.detail ? e.clientY - r.top : r.height / 2) + "px";
+          btn.append(s);
+          s.addEventListener("animationend", () => s.remove());
+        }
+
+        // Scroll-reveal: adds .in when an element enters the viewport (and starts counters inside it)
+        const io =
+          "IntersectionObserver" in window
+            ? new IntersectionObserver(
+                (entries) =>
+                  entries.forEach((en) => {
+                    if (!en.isIntersecting) return;
+                    const t = en.target;
+                    t.classList.add("in");
+                    io.unobserve(t);
+                    const c = t.querySelector("[data-count]");
+                    if (c) countUp(c, +c.dataset.count, c.dataset.suffix || "");
+                  }),
+                { threshold: 0.15 },
+              )
+            : null;
+        const watch = (n) => (io ? io.observe(n) : n.classList.add("in"));
+
+        // Confetti on a lightweight overlay canvas; its loop only runs while particles exist
+        const fx = $("#fx"),
+          fctx = fx.getContext("2d");
+        let bits = [],
+          fxRaf = 0;
+        const sizeFx = () => {
+          fx.width = innerWidth;
+          fx.height = innerHeight;
+        };
+        function burst(x, y, n = 28, power = 9) {
+          if (REDUCED) return;
+          const cols = [
+            "#6c7bff",
+            "#c08bff",
+            "#2ecc8f",
+            "#ffb84d",
+            "#ff6b88",
+            "#ffffff",
+          ];
+          for (let i = 0; i < n; i++) {
+            const a = Math.random() * 6.283,
+              v = power * (0.4 + Math.random() * 0.8);
+            bits.push({
+              x,
+              y,
+              vx: Math.cos(a) * v,
+              vy: Math.sin(a) * v - 4,
+              w: 5 + Math.random() * 5,
+              h: 3 + Math.random() * 4,
+              r: Math.random() * 6,
+              vr: (Math.random() - 0.5) * 0.4,
+              c: cols[i % cols.length],
+              life: 0,
+            });
+          }
+          if (!fxRaf) fxRaf = requestAnimationFrame(fxLoop);
+        }
+        function fxLoop() {
+          fctx.clearRect(0, 0, fx.width, fx.height);
+          bits = bits.filter((b) => b.life < 110 && b.y < fx.height + 20);
+          for (const b of bits) {
+            b.vy += 0.28;
+            b.vx *= 0.985;
+            b.x += b.vx;
+            b.y += b.vy;
+            b.r += b.vr;
+            b.life++;
+            fctx.save();
+            fctx.translate(b.x, b.y);
+            fctx.rotate(b.r);
+            fctx.globalAlpha = Math.min(1, (110 - b.life) / 30);
+            fctx.fillStyle = b.c;
+            fctx.fillRect(-b.w / 2, -b.h / 2, b.w, b.h);
+            fctx.restore();
+          }
+          fxRaf = bits.length ? requestAnimationFrame(fxLoop) : 0;
+        }
+
+        // Interactive particle-network background
+        const bgc = $("#bg"),
+          bx = bgc.getContext("2d"),
+          mouse = { x: -999, y: -999 };
+        let W = 0,
+          H = 0,
+          dots = [];
+        function sizeBg(keep) {
+          const d = Math.min(devicePixelRatio || 1, 2);
+          W = innerWidth;
+          H = innerHeight;
+          bgc.width = W * d;
+          bgc.height = H * d;
+          bx.setTransform(d, 0, 0, d, 0, 0);
+          if (keep && dots.length) return;
+          const n = Math.round(Math.min(70, (W * H) / 22000));
+          dots = Array.from({ length: n }, () => ({
+            x: Math.random() * W,
+            y: Math.random() * H,
+            vx: (Math.random() - 0.5) * 0.35,
+            vy: (Math.random() - 0.5) * 0.35,
+            r: 1 + Math.random() * 1.6,
+          }));
+        }
+        function drawBg() {
+          bx.clearRect(0, 0, W, H);
+          for (const d of dots) {
+            d.x += d.vx;
+            d.y += d.vy;
+            if (d.x < 0) d.vx = Math.abs(d.vx);
+            else if (d.x > W) d.vx = -Math.abs(d.vx);
+            if (d.y < 0) d.vy = Math.abs(d.vy);
+            else if (d.y > H) d.vy = -Math.abs(d.vy);
+            const dx = d.x - mouse.x,
+              dy = d.y - mouse.y,
+              dist = Math.hypot(dx, dy);
+            if (dist < 130 && dist > 0) {
+              d.x += (dx / dist) * 1.2;
+              d.y += (dy / dist) * 1.2;
+            } // gently pushed away by the cursor
+          }
+          bx.fillStyle = "rgba(160,176,255,.7)";
+          for (let i = 0; i < dots.length; i++) {
+            const a = dots[i];
+            bx.beginPath();
+            bx.arc(a.x, a.y, a.r, 0, 6.283);
+            bx.fill();
+            for (let j = i + 1; j < dots.length; j++) {
+              const b = dots[j],
+                d = Math.hypot(a.x - b.x, a.y - b.y);
+              if (d < 120) {
+                bx.strokeStyle = `rgba(124,138,255,${(1 - d / 120) * 0.35})`;
+                bx.beginPath();
+                bx.moveTo(a.x, a.y);
+                bx.lineTo(b.x, b.y);
+                bx.stroke();
+              }
+            }
+            const m = Math.hypot(a.x - mouse.x, a.y - mouse.y);
+            if (m < 170) {
+              bx.strokeStyle = `rgba(192,139,255,${(1 - m / 170) * 0.55})`;
+              bx.beginPath();
+              bx.moveTo(a.x, a.y);
+              bx.lineTo(mouse.x, mouse.y);
+              bx.stroke();
+            }
+          }
+        }
+        function loopBg() {
+          if (!document.hidden) drawBg();
+          requestAnimationFrame(loopBg);
+        }
+
+        /* ---------- Best scores (localStorage, tolerant of missing/corrupt data) ---------- */
+        function loadBest() {
+          try {
+            const o = JSON.parse(localStorage.getItem(KEY));
+            if (o && typeof o === "object" && !Array.isArray(o)) return o;
+          } catch (e) {}
+          return {};
+        }
+        const validBest = (b) =>
+          b && [b.score, b.total, b.pct].every(Number.isFinite);
+        function saveBest(cat, score, total, pct) {
+          const all = loadBest(),
+            old = all[cat];
+          if (validBest(old) && old.pct >= pct) return false;
+          all[cat] = { score, total, pct };
+          try {
+            localStorage.setItem(KEY, JSON.stringify(all));
+          } catch (e) {}
+          return true;
+        }
+
+        /* ---------- Sound (off by default) ---------- */
+        let soundOn = false,
+          actx = null;
+        function beep(freq, dur = 0.12, type = "sine") {
+          if (!soundOn) return;
+          try {
+            actx =
+              actx || new (window.AudioContext || window.webkitAudioContext)();
+            const o = actx.createOscillator(),
+              g = actx.createGain();
+            o.type = type;
+            o.frequency.value = freq;
+            g.gain.value = 0.07;
+            o.connect(g);
+            g.connect(actx.destination);
+            o.start();
+            o.stop(actx.currentTime + dur);
+          } catch (e) {}
+        }
+
+        /* ---------- Screens + animated page transitions ---------- */
+        let S = null; // current quiz state
+        function clearTimers() {
+          if (S) {
+            clearInterval(S.tid);
+            S.tid = null;
+            clearTimeout(S.adv);
+          }
+        }
+        function show(id) {
+          clearTimers(); // timers never survive a screen change
+          document
+            .querySelectorAll(".screen")
+            .forEach((s) => (s.hidden = s.id !== id));
+          const h = $("#" + id).querySelector('[tabindex="-1"]');
+          window.scrollTo(0, 0);
+          if (h) h.focus({ preventScroll: true });
+        }
+        // nav(): plays the curtain wipe, swaps screens while fully covered. If clicked again mid-wipe, the latest request wins.
+        const veil = $("#veil");
+        let navFn = null,
+          navBusy = false;
+        function nav(fn) {
+          navFn = fn;
+          if (navBusy) return;
+          if (REDUCED) {
+            navFn = null;
+            fn();
+            return;
+          }
+          navBusy = true;
+          veil.className = "veil in";
+          setTimeout(() => {
+            const f = navFn;
+            navFn = null;
+            try {
+              if (f) f();
+            } finally {
+              veil.className = "veil out";
+              setTimeout(() => {
+                veil.className = "veil";
+                navBusy = false;
+              }, 480);
+            }
+          }, 470);
+        }
+        function tiltMove(e) {
+          // 3D tilt + moving glare on category cards
+          if (e.pointerType === "touch" || REDUCED) return;
+          const b = e.currentTarget,
+            r = b.getBoundingClientRect(),
+            x = e.clientX - r.left,
+            y = e.clientY - r.top;
+          b.classList.add("tilt");
+          b.style.setProperty(
+            "--rx",
+            ((0.5 - y / r.height) * 12).toFixed(2) + "deg",
+          );
+          b.style.setProperty(
+            "--ry",
+            ((x / r.width - 0.5) * 14).toFixed(2) + "deg",
+          );
+          b.style.setProperty("--gx", x + "px");
+          b.style.setProperty("--gy", y + "px");
+        }
+        function tiltEnd(e) {
+          const b = e.currentTarget;
+          b.classList.remove("tilt");
+          b.style.removeProperty("--rx");
+          b.style.removeProperty("--ry");
+        }
+        function goCats() {
+          if (S) S.active = false;
+          const grid = $("#catGrid"),
+            best = loadBest();
+          grid.replaceChildren();
+          CATS.forEach((c, i) => {
+            const b = el("button", "cat"),
+              bs = best[c.id];
+            b.type = "button";
+            b.style.setProperty("--i", i);
+            b.append(
+              el("span", "ico", c.icon),
+              el("strong", "", c.name),
+              el("small", "", QUIZ[c.id].length + " questions"),
+              el(
+                "span",
+                "best",
+                validBest(bs)
+                  ? `Best: ${bs.score}/${bs.total} (${bs.pct}%)`
+                  : "Best: not played yet",
+              ),
+              el("span", "arr", "→"),
+            );
+            b.addEventListener("click", () => nav(() => startQuiz(c.id)));
+            b.addEventListener("pointermove", tiltMove);
+            b.addEventListener("pointerleave", tiltEnd);
+            grid.append(b);
+          });
+          show("s-cats");
+        }
+
+        /* ---------- Quiz flow ---------- */
+        function startQuiz(cat) {
+          clearTimers();
+          // Shuffle question order AND option order, tagging the correct option so it survives shuffling
+          const qs = shuffle(QUIZ[cat]).map(([q, c, w, e]) => ({
+            q,
+            e,
+            opts: shuffle([
+              { t: c, ok: true },
+              ...w.map((t) => ({ t, ok: false })),
+            ]),
+          }));
+          S = {
+            cat,
+            qs,
+            i: 0,
+            score: 0,
+            correct: 0,
+            wrong: 0,
+            skipped: 0,
+            spent: 0,
+            picks: [],
+            active: true,
+            locked: false,
+            paused: false,
+            remaining: 0,
+            deadline: 0,
+            tid: null,
+            adv: null,
+          };
+          show("s-quiz");
+          $("#bar").style.width = "0%";
+          $("#prog").setAttribute("aria-valuenow", 0);
+          renderQuestion();
+        }
+        function updateHud() {
+          $("#qnum").textContent = `${S.i + 1} / ${S.qs.length}`;
+          $("#score").textContent = `${S.score} / ${S.qs.length * PTS}`;
+          $("#corr").textContent = S.correct;
+        }
+        function renderQuestion() {
+          const q = S.qs[S.i];
+          S.locked = false;
+          S.paused = false;
+          $("#card").classList.remove("paused");
+          $("#pauseMsg").hidden = true;
+          $("#qbody").inert = false;
+          $("#pauseBtn").disabled = false;
+          $("#pauseBtn").textContent = "⏸ Pause";
+          $("#qcat").textContent = catName(S.cat);
+          splitWords($("#qtext"), q.q);
+          const box = $("#opts");
+          box.replaceChildren();
+          q.opts.forEach((o, k) => {
+            const b = el("button", "opt");
+            b.type = "button";
+            b.style.setProperty("--i", k);
+            b.append(
+              el("span", "key", String.fromCharCode(65 + k)),
+              el("span", "", o.t),
+            );
+            b.addEventListener("click", (e) => {
+              choose(k);
+              ripple(b, e);
+            });
+            box.append(b);
+          });
+          const fb = $("#fb");
+          fb.className = "fb";
+          fb.textContent = "";
+          $("#next").disabled = true; // progression blocked until answered or timer expires
+          const card = $("#card");
+          card.style.animation = "none";
+          void card.offsetWidth;
+          card.style.animation = ""; // replay card entrance
+          updateHud();
+          startTimer(TIME * 1000);
+          $("#qtext").focus({ preventScroll: true });
+        }
+
+        /* Timer is deadline-based (performance.now) so it stays accurate even if the browser throttles intervals */
+        function startTimer(ms) {
+          clearInterval(S.tid);
+          S.remaining = ms;
+          S.deadline = performance.now() + ms;
+          paintTimer();
+          S.tid = setInterval(tick, 100);
+        }
+        function tick() {
+          if (!S || !S.active || S.locked || S.paused) return;
+          S.remaining = Math.max(0, S.deadline - performance.now());
+          paintTimer();
+          if (S.remaining <= 0) lock(null); // time expired -> counts as unanswered
+        }
+        function paintTimer() {
+          const sec = Math.ceil(S.remaining / 1000),
+            low = sec <= 5;
+          $("#time").textContent = sec + "s";
+          $("#timeBox").classList.toggle("low", low);
+          $("#tbar").classList.toggle("low", low);
+          $("#tbar").style.width = (S.remaining / (TIME * 1000)) * 100 + "%";
+        }
+        function setPaused(p) {
+          if (!S || !S.active || S.locked) return;
+          if (p && !S.paused) {
+            S.remaining = Math.max(0, S.deadline - performance.now());
+            S.paused = true;
+          } else if (!p && S.paused) {
+            S.paused = false;
+            S.deadline = performance.now() + S.remaining;
+          }
+          $("#card").classList.toggle("paused", S.paused);
+          $("#pauseMsg").hidden = !S.paused;
+          $("#qbody").inert = S.paused; // blocks clicks and keyboard while paused
+          $("#pauseBtn").textContent = S.paused ? "▶ Resume" : "⏸ Pause";
+        }
+        function choose(k) {
+          if (S && S.active && !S.paused && !S.locked) lock(k);
+        }
+
+        /* Single entry point for answering OR timing out. The `locked` flag makes it run once per question,
+   so a click and a timer expiry can never both score. */
+        function lock(k) {
+          if (!S || !S.active || S.locked) return;
+          S.locked = true;
+          clearInterval(S.tid);
+          if (k !== null)
+            S.remaining = Math.max(0, S.deadline - performance.now());
+          S.spent += TIME * 1000 - S.remaining;
+          const q = S.qs[S.i],
+            right = q.opts.find((o) => o.ok).t,
+            ok = k !== null && q.opts[k].ok;
+          S.picks[S.i] = k;
+          if (k === null) S.skipped++;
+          else if (ok) {
+            S.correct++;
+            S.score += PTS;
+          } else S.wrong++;
+          [...$("#opts").children].forEach((b, j) => {
+            b.disabled = true;
+            b.classList.toggle("sel", j === k);
+            if (q.opts[j].ok) b.classList.add("ok");
+            else if (j === k) b.classList.add("bad");
+          });
+          const fb = $("#fb");
+          if (ok) {
+            const m = ["Nice work!", "Spot on!", "Brilliant!", "Correct!"];
+            fb.className = "fb show ok";
+            fb.textContent = `${m[Math.floor(Math.random() * m.length)]} +${PTS} points. ${q.e}`;
+            beep(660);
+            setTimeout(() => beep(880), 110);
+            const r = $("#opts").children[k].getBoundingClientRect();
+            burst(r.left + r.width / 2, r.top + r.height / 2, 26, 7); // confetti from the chosen answer
+            retrigger($("#score"), "bump");
+            retrigger($("#corr"), "bump");
+            floatText($("#score").parentElement, "+" + PTS);
+          } else if (k === null) {
+            fb.className = "fb show info";
+            fb.textContent = `Time's up! The answer was "${right}". ${q.e}`;
+            beep(330, 0.25);
+          } else {
+            fb.className = "fb show bad";
+            fb.textContent = `Not quite. The answer was "${right}". ${q.e}`;
+            beep(200, 0.25, "sawtooth");
+          }
+          const last = S.i + 1 >= S.qs.length;
+          $("#next").textContent = last ? "See Results" : "Next Question";
+          $("#next").disabled = false;
+          $("#pauseBtn").disabled = true;
+          const w = ((S.i + 1) / S.qs.length) * 100;
+          $("#bar").style.width = w + "%";
+          $("#prog").setAttribute("aria-valuenow", Math.round(w));
+          updateHud();
+          if (k === null) scheduleAdvance();
+          else $("#next").focus();
+        }
+        function scheduleAdvance() {
+          // auto-advance after a timeout; guarded by question index
+          const idx = S.i;
+          clearTimeout(S.adv);
+          S.adv = setTimeout(() => {
+            if (S && S.active && S.i === idx) next();
+          }, 1800);
+        }
+        function next() {
+          if (!S || !S.active || !S.locked) return;
+          clearTimeout(S.adv);
+          if (S.i + 1 >= S.qs.length) {
+            S.active = false;
+            nav(finish);
+          } // active=false makes repeat clicks no-ops during the wipe
+          else {
+            S.i++;
+            renderQuestion();
+          }
+        }
+
+        /* ---------- Results ---------- */
+        function finish() {
+          S.active = false;
+          const n = S.qs.length,
+            total = n * PTS,
+            pct = Math.round((S.score / total) * 100);
+          const isBest = saveBest(S.cat, S.score, total, pct);
+          splitWords($("#s-result h2"), "Quiz complete!");
+          show("s-result");
+          const msg =
+            pct >= 90
+              ? "Outstanding! You have mastered this topic."
+              : pct >= 70
+                ? "Great job! You know your stuff."
+                : pct >= 50
+                  ? "Good effort! A little more practice and you will get there."
+                  : "Keep practicing. Every attempt makes you better!";
+          $("#msg").textContent = `${catName(S.cat)}: ${msg}`;
+          $("#newBest").hidden = !isBest;
+          const rs = $("#rstats");
+          rs.replaceChildren();
+          [
+            ["Score", `${S.score} / ${total}`],
+            ["Percentage", pct + "%"],
+            ["Correct", S.correct],
+            ["Incorrect", S.wrong],
+            ["Unanswered", S.skipped],
+            ["Time taken", fmt(S.spent)],
+          ].forEach(([l, v], i) => {
+            const d = el("div"),
+              b = el("b", "", typeof v === "number" ? "0" : String(v));
+            d.style.setProperty("--i", i);
+            d.append(el("span", "", l), b);
+            rs.append(d);
+            if (typeof v === "number") countUp(b, v, "", 1000);
+          });
+          // Animated ring + counter
+          const ring = $("#ring"),
+            C = 339.292;
+          ring.style.strokeDashoffset = C;
+          void ring.getBoundingClientRect();
+          ring.style.strokeDashoffset = C * (1 - pct / 100);
+          countUp($("#pct"), pct, "%", 1300);
+          if (pct >= 70)
+            setTimeout(() => {
+              // celebrate good scores
+              if ($("#s-result").hidden) return;
+              burst(innerWidth * 0.25, innerHeight * 0.4, 60, 13);
+              burst(innerWidth * 0.75, innerHeight * 0.4, 60, 13);
+            }, 650);
+          // Detailed review (each card reveals as it scrolls into view)
+          const list = $("#review");
+          list.replaceChildren();
+          S.qs.forEach((q, i) => {
+            const k = S.picks[i],
+              right = q.opts.find((o) => o.ok).t;
+            const li = el(
+              "li",
+              "rv " + (k === null ? "skip" : q.opts[k].ok ? "ok" : ""),
+            );
+            li.style.setProperty("--d", i % 3);
+            const you = el("p");
+            you.append(
+              "Your answer: ",
+              el(
+                "b",
+                "",
+                k === null ? "No answer (time expired)" : q.opts[k].t,
+              ),
+            );
+            const cor = el("p");
+            cor.append("Correct answer: ", el("b", "", right));
+            li.append(
+              el("p", "", `${i + 1}. ${q.q}`),
+              you,
+              cor,
+              el("p", "", q.e),
+            );
+            list.append(li);
+            watch(li);
+          });
+        }
+
+        /* ---------- Confirmation dialog (pauses the quiz while open) ---------- */
+        const dlg = $("#dlg");
+        let pending = null,
+          wasPaused = false;
+        function confirmThen(msg, action) {
+          if (!S || !S.active) {
+            action();
+            return;
+          }
+          wasPaused = S.paused;
+          setPaused(true);
+          clearTimeout(S.adv);
+          pending = action;
+          $("#dlgMsg").textContent = msg;
+          dlg.returnValue = "";
+          dlg.showModal();
+        }
+        dlg.addEventListener("close", () => {
+          const a = pending;
+          pending = null;
+          if (dlg.returnValue === "yes" && a) {
+            a();
+            return;
+          }
+          if (S && S.active) {
+            if (!wasPaused) setPaused(false);
+            if (S.locked && S.picks[S.i] === null) scheduleAdvance();
+          }
+        });
+
+        /* ---------- Event wiring ---------- */
+        const toCats = () => nav(goCats);
+        $("#start").addEventListener("click", toCats);
+        $("#start2").addEventListener("click", toCats);
+        $("#backHome").addEventListener("click", () =>
+          nav(() => show("s-home")),
+        );
+        $("#next").addEventListener("click", next);
+        $("#pauseBtn").addEventListener("click", () => setPaused(!S.paused));
+        $("#restartBtn").addEventListener("click", () => {
+          const c = S.cat;
+          confirmThen(
+            "Restart this quiz? Your current progress will be lost.",
+            () => nav(() => startQuiz(c)),
+          );
+        });
+        $("#exitBtn").addEventListener("click", () =>
+          confirmThen(
+            "Leave this quiz? Your current progress will be lost.",
+            () => {
+              S.active = false;
+              nav(goCats);
+            },
+          ),
+        );
+        $("#retry").addEventListener("click", () => {
+          const c = S.cat;
+          nav(() => startQuiz(c));
+        });
+        $("#another").addEventListener("click", toCats);
+        $("#sound").addEventListener("click", (e) => {
+          soundOn = !soundOn;
+          e.currentTarget.setAttribute("aria-pressed", soundOn);
+          e.currentTarget.textContent = soundOn
+            ? "🔊 Sound: On"
+            : "🔇 Sound: Off";
+          beep(660);
+        });
+        // Keyboard shortcuts: 1-4 or A-D choose an answer
+        document.addEventListener("keydown", (e) => {
+          if (
+            !S ||
+            !S.active ||
+            S.locked ||
+            S.paused ||
+            dlg.open ||
+            e.ctrlKey ||
+            e.metaKey ||
+            e.altKey ||
+            e.key.length !== 1
+          )
+            return;
+          const k = "1234abcd".indexOf(e.key.toLowerCase());
+          if (k >= 0) choose(k % 4);
+        });
+        // Auto-pause when the tab is hidden so the timer stays fair
+        document.addEventListener("visibilitychange", () => {
+          if (document.hidden) setPaused(true);
+        });
+
+        /* ---------- Motion wiring: cursor, magnetic buttons, parallax, scroll ---------- */
+        const deco = $("#deco");
+        const curs =
+          FINE && !REDUCED
+            ? document.body.appendChild(el("div", "curs"))
+            : null;
+        if (curs) curs.setAttribute("aria-hidden", "true");
+        let cx = 0,
+          cy = 0,
+          tx = 0,
+          ty = 0,
+          cRaf = 0,
+          magEl = null;
+        function cursLoop() {
+          // smooth-follow ring; stops itself once it catches up
+          cx += (tx - cx) * 0.18;
+          cy += (ty - cy) * 0.18;
+          curs.style.transform = `translate3d(${cx}px,${cy}px,0)`;
+          cRaf =
+            Math.abs(tx - cx) + Math.abs(ty - cy) > 0.3
+              ? requestAnimationFrame(cursLoop)
+              : 0;
+        }
+        const resetMag = () => {
+          if (magEl) {
+            magEl.style.removeProperty("--mx");
+            magEl.style.removeProperty("--my");
+            magEl = null;
+          }
+        };
+        document.addEventListener(
+          "pointermove",
+          (e) => {
+            if (e.pointerType === "touch") return;
+            mouse.x = e.clientX;
+            mouse.y = e.clientY;
+            deco.style.setProperty(
+              "--px",
+              ((e.clientX / innerWidth - 0.5) * 2).toFixed(3),
+            );
+            deco.style.setProperty(
+              "--py",
+              ((e.clientY / innerHeight - 0.5) * 2).toFixed(3),
+            );
+            const m = e.target.closest ? e.target.closest(".mag") : null;
+            if (m !== magEl) resetMag();
+            if (m && !REDUCED) {
+              // magnetic pull toward the cursor
+              const r = m.getBoundingClientRect();
+              magEl = m;
+              m.style.setProperty(
+                "--mx",
+                ((e.clientX - r.left - r.width / 2) * 0.25).toFixed(1) + "px",
+              );
+              m.style.setProperty(
+                "--my",
+                ((e.clientY - r.top - r.height / 2) * 0.35).toFixed(1) + "px",
+              );
+            }
+            if (curs) {
+              tx = e.clientX;
+              ty = e.clientY;
+              curs.classList.add("on");
+              curs.classList.toggle(
+                "big",
+                !!(
+                  e.target.closest && e.target.closest("button:not(:disabled)")
+                ),
+              );
+              if (!cRaf) cRaf = requestAnimationFrame(cursLoop);
+            }
+          },
+          { passive: true },
+        );
+        document.documentElement.addEventListener("pointerleave", () => {
+          mouse.x = mouse.y = -999;
+          resetMag();
+          if (curs) curs.classList.remove("on");
+        });
+
+        let scrollQueued = false;
+        addEventListener(
+          "scroll",
+          () => {
+            // scroll progress bar + aurora parallax
+            if (scrollQueued) return;
+            scrollQueued = true;
+            requestAnimationFrame(() => {
+              scrollQueued = false;
+              const y = scrollY,
+                max = document.documentElement.scrollHeight - innerHeight;
+              $("#spbar").style.transform =
+                `scaleX(${max > 0 ? Math.min(1, y / max) : 0})`;
+              $("#aur").style.setProperty("--sy", y);
+            });
+          },
+          { passive: true },
+        );
+
+        let lastW = innerWidth;
+        addEventListener("resize", () => {
+          sizeBg(innerWidth === lastW);
+          lastW = innerWidth;
+          sizeFx();
+          if (REDUCED) drawBg();
+        });
+
+        /* ---------- Init ---------- */
+        splitChars($("#hero"), "QuizMaster");
+        (function buildMarquee() {
+          // two identical sets so translateX(-50%) loops seamlessly
+          const t = $("#mq");
+          for (let r = 0; r < 2; r++) {
+            const set = el("div", "set");
+            CATS.forEach((c) =>
+              set.append(el("span", "", c.name), el("span", "dot", "✦")),
+            );
+            t.append(set);
+          }
+        })();
+        const liveWord = $("#liveWord");
+        let wi = 0;
+        liveWord.textContent = CATS[0].name;
+        if (!REDUCED)
+          setInterval(() => {
+            // rotating "Now playing" badge
+            if (document.hidden) return;
+            wi = (wi + 1) % CATS.length;
+            liveWord.textContent = CATS[wi].name;
+            retrigger(liveWord, "sw");
+          }, 2200);
+        document.querySelectorAll(".rv").forEach(watch);
+        sizeBg(false);
+        sizeFx();
+        if (REDUCED) drawBg();
+        else requestAnimationFrame(loopBg);
+      })();
+    </script>
+  </body>
+</html>
